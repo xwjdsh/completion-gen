@@ -21,7 +21,7 @@ func init() {
 	}
 
 	if _, err := tpl.ParseGlob("tmpls/*.tmpl"); err != nil {
-		log.Panicf("gen: parse glob failed: %w", err)
+		log.Panicf("gen: parse glob failed: %v", err)
 	}
 }
 

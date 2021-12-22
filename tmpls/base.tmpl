@@ -5,7 +5,7 @@
 	{{- if .SubCommands }}
   subcommands: [
 	{{- range .SubCommands}}
-		{{- template "command" . }}
+		{{- template "command" . }},
 	{{- end}}
 	],
 	{{- end}}
@@ -32,8 +32,7 @@
 	{{- end}}
   ],
 	{{- end}}
-},
-{{- end }}
-
+}
+{{- end -}}
 const completionSpec: Fig.Spec = 
-{{- template "command" . }}
+{{- template "command" . }};
