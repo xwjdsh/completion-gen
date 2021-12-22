@@ -1,0 +1,39 @@
+{{- define "command" }}
+{
+  name: "{{.Name}}",
+  description: "{{.Desc}}",
+	{{- if .SubCommands }}
+  subcommands: [
+	{{- range .SubCommands}}
+		{{- template "command" . }}
+	{{- end}}
+	],
+	{{- end}}
+	{{- if .Options}}
+  options: [
+	{{- range .Options}}
+    {
+      name: [{{.Name}}],
+      description: "{{.Desc}}",
+			{{- if eq (len .Args) 1 }}
+      args: {
+        name: "{{(index .Args 0).Name}}",
+      },
+			{{- else if gt (len .Args) 1 }}
+      args: [
+	      {{- range .Args}}
+				{
+        	name: "{{.Name}}",
+				},
+				{{- end}}
+      ],
+			{{- end}}
+    },
+	{{- end}}
+  ],
+	{{- end}}
+},
+{{- end }}
+
+const completionSpec: Fig.Spec = 
+{{- template "command" . }}
