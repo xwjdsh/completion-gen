@@ -1,1 +1,476 @@
 {{ template "base.tmpl" . }}
+
+const postProcessDockerPs: Fig.Generator["postProcess"] = (out) => {
+  return out.split("\n").map((i) => {
+    try {
+      const parsedJSON: Record<string, string> = JSON.parse(i);
+      return {
+        name: parsedJSON.Names,
+        displayName: `${parsedJSON.Names} (${parsedJSON.Image})`,
+        icon: "fig://icon?type=docker",
+      };
+    } catch (error) {
+      console.error(error);
+    }
+  });
+};
+
+const sharedPostProcess: Fig.Generator["postProcess"] = (out) => {
+  return out
+    .split("\n")
+    .map((line) => JSON.parse(line))
+    .map((i) => ({
+      name: i.Name,
+      description: i.ID,
+      icon: "fig://icon?type=docker",
+    }));
+};
+
+const dockerGenerators: Record<string, Fig.Generator> = {
+  runningDockerContainers: {
+    script: `docker ps --format '{{`{{ json . }}`}}'`,
+    postProcess: postProcessDockerPs,
+  },
+  allDockerContainers: {
+    script: `docker ps -a --format '{{`{{ json . }}`}}'`,
+    postProcess: postProcessDockerPs,
+  },
+  pausedDockerContainers: {
+    script: `docker ps --filter status=paused --format '{{`{{ json . }}`}}'`,
+    postProcess: postProcessDockerPs,
+  },
+  allLocalImages: {
+    script: `docker image ls --format '{{`{{ json . }}`}}'`,
+    postProcess: function (out) {
+      return out
+        .split("\n")
+        .map((line) => JSON.parse(line))
+        .map((i) => ({
+          name: `${i.ID}`,
+          displayName: `${i.Repository} - ${i.ID}`,
+          icon: "fig://icon?type=docker",
+        }));
+    },
+  },
+  dockerHubSearch: {
+    script: function (context) {
+      if (context[context.length - 1] === "") return "";
+      const searchTerm = context[context.length - 1];
+      return `docker search ${searchTerm} --format '{{`{{ json . }}`}}'`;
+    },
+    postProcess: function (out) {
+      return out
+        .split("\n")
+        .map((line) => JSON.parse(line))
+        .map((i) => ({
+          name: `${i.Name}`,
+          icon: "fig://icon?type=docker",
+        }));
+    },
+    trigger: function () {
+      return true;
+    },
+  },
+  allDockerContexts: {
+    script: `docker context list --format '{{`{{ json . }}`}}'`,
+    postProcess: function (out) {
+      return out
+        .split("\n")
+        .map((line) => JSON.parse(line))
+        .map((i) => ({
+          name: i.Name,
+          description: i.Description,
+          icon: "fig://icon?type=docker",
+        }));
+    },
+  },
+  listDockerNetworks: {
+    script: `docker network list --format '{{`{{ json . }}`}}'`,
+    postProcess: sharedPostProcess,
+  },
+  listDockerSwarmNodes: {
+    script: `docker node list --format '{{`{{ json . }}`}}'`,
+    postProcess: function (out) {
+      return out
+        .split("\n")
+        .map((line) => JSON.parse(line))
+        .map((i) => ({
+          name: i.ID,
+          displayName: `${i.ID} - ${i.Hostname}`,
+          description: i.Status,
+          icon: "fig://icon?type=docker",
+        }));
+    },
+  },
+  listDockerPlugins: {
+    script: `docker plugin list --format '{{`{{ json . }}`}}'`,
+    postProcess: sharedPostProcess,
+  },
+  listDockerSecrets: {
+    script: `docker secret list --format '{{`{{ json . }}`}}'`,
+    postProcess: sharedPostProcess,
+  },
+  listDockerServices: {
+    script: `docker service list --format '{{`{{ json . }}`}}'`,
+    postProcess: function (out) {
+      return out
+        .split("\n")
+        .map((line) => JSON.parse(line))
+        .map((i) => ({
+          name: i.Name,
+          description: i.Image,
+          icon: "fig://icon?type=docker",
+        }));
+    },
+  },
+  listDockerServicesReplicas: {
+    script: `docker service list --format '{{`{{ json . }}`}}'`,
+    postProcess: function (out) {
+      return out
+        .split("\n")
+        .map((line) => JSON.parse(line))
+        .map((i) => ({
+          name: `${i.Name}=`,
+          description: i.Image,
+          icon: "fig://icon?type=docker",
+        }));
+    },
+  },
+  listDockerStacks: {
+    script: `docker stack list --format '{{`{{ json . }}`}}'`,
+    postProcess: function (out) {
+      return out
+        .split("\n")
+        .map((line) => JSON.parse(line))
+        .map((i) => ({
+          name: i.Name,
+          icon: "fig://icon?type=docker",
+        }));
+    },
+  },
+  listDockerVolumes: {
+    script: `docker volume list --format '{{`{{ json . }}`}}'`,
+    postProcess: function (out) {
+      return out
+        .split("\n")
+        .map((line) => JSON.parse(line))
+        .map((i) => ({
+          name: i.Name,
+          icon: "fig://icon?type=docker",
+        }));
+    },
+  },
+};
+
+const containersArg = {
+  name: "container",
+  generators: dockerGenerators.runningDockerContainers,
+};
+
+const imagesArg = {
+  name: "image",
+  generators: dockerGenerators.allLocalImages,
+};
+
+const containerAndCommandArgs = [
+  containersArg,
+  {
+    name: "command",
+    isCommand: true,
+  },
+];
+
+const contextsArg = {
+  name: "CONTEXT",
+  generators: dockerGenerators.allDockerContexts,
+};
+
+completionSpec.subcommands.forEach((command) => {
+  // containersArg
+  switch (command.name) {
+    case "commit":
+      command.args = [
+        containersArg,
+        {
+          name: "[REPOSITORY[:TAG]]",
+        },
+      ];
+      break;
+    case "kill":
+      command.args = { ...containersArg, isVariadic: true };
+      break;
+    case "port":
+      command.args = [
+        containersArg,
+        {
+          name: "[PRIVATE_PORT[/PROTO]]",
+        },
+      ];
+      break;
+    case "rename":
+      command.args = [
+        containersArg,
+        {
+          name: "NEW_NAME",
+        },
+      ];
+      break;
+    case "container":
+      command.subcommands.find((c) => c.name == "inspect").args = containersArg;
+      break;
+    case "network":
+      command.subcommands
+        .filter((c) => c.name == "connect" || c.name == "disconnect")
+        .forEach((c) => {
+          c.args = [
+            {
+              name: "NETWORK",
+              generators: dockerGenerators.listDockerNetworks,
+            },
+            containersArg,
+          ];
+        });
+      break;
+    case "exec":
+      command.args = [
+        containersArg,
+        {
+          name: "command",
+          isCommand: true,
+        },
+      ];
+      break;
+    case "logs":
+    case "diff":
+    case "export":
+    case "pause":
+    case "restart":
+    case "stats":
+    case "stop":
+    case "top":
+    case "update":
+    case "wait":
+      command.args = containersArg;
+  }
+
+  // imagesArg
+  switch (command.name) {
+    case "history":
+    case "save":
+      command.args = imagesArg;
+      break;
+    case "image":
+      command.subcommands.find((c) => c.name == "inspect").args = imagesArg;
+      break;
+    case "service":
+      command.subcommands.find((c) => c.name == "create").args = [
+        imagesArg,
+        {
+          name: "COMMAND",
+          isOptional: true,
+          isCommand: true,
+        },
+      ];
+      break;
+    case "rmi":
+      command.args = { ...imagesArg, isVariadic: true };
+      break;
+    case "trust":
+      command.subcommands
+        .filter((c) => c.name == "revoke" || c.name == "sign")
+        .forEach((c) => {
+          c.args = imagesArg;
+        });
+  }
+
+  // contextsArg
+  if (command.name == "context") {
+    command.subcommands.find((c) => c.name == "export").args = [
+      contextsArg,
+      {
+        name: "FILE",
+        template: "filepaths",
+      },
+    ];
+    command.subcommands
+      .filter((c) => c.name == "inspect" || c.name == "rm")
+      .forEach((c) => {
+        c.args = { ...contextsArg, isVariadic: true };
+      });
+    command.subcommands
+      .filter((c) => c.name == "update" || c.name == "use")
+      .forEach((c) => {
+        c.args = contextsArg;
+      });
+  }
+
+  // dockerGenerators.allDockerContainers
+  switch (command.name) {
+    case "rm":
+      command.args = {
+        isVariadic: true,
+        name: "containers",
+        generators: dockerGenerators.allDockerContainers,
+      };
+      break;
+    case "start":
+      command.args = {
+        name: "container",
+        generators: dockerGenerators.allDockerContainers,
+      };
+      break;
+  }
+
+  // dockerGenerators.pausedDockerContainers
+  if (command.name == "unpause") {
+    command.args = {
+      name: "container",
+      generators: dockerGenerators.pausedDockerContainers,
+    };
+  }
+
+  // dockerGenerators.allLocalImages
+  if (command.name == "create") {
+    command.args = [
+      {
+        name: "container",
+        generators: dockerGenerators.allLocalImages,
+      },
+      {
+        name: "command",
+        isCommand: true,
+      },
+    ];
+  }
+
+  // dockerGenerators.dockerHubSearch
+  if (command.name == "pull") {
+    command.args = {
+      name: "NAME[:TAG|@DIGEST]",
+      generators: dockerGenerators.dockerHubSearch,
+      debounce: true,
+    };
+  }
+
+  // dockerGenerators.listDockerNetworks
+  if (command.name == "network") {
+    command.subcommands
+      .filter((c) => c.name == "inspect" || c.name == "rm")
+      .forEach((c) => {
+        c.args = {
+          name: "NETWORK",
+          generators: dockerGenerators.listDockerNetworks,
+          isVariadic: true,
+        };
+      });
+  }
+
+  // dockerGenerators.listDockerSwarmNodes
+  if (command.name == "node") {
+    command.subcommands
+      .filter(
+        (c) =>
+          c.name == "demote" ||
+          c.name == "inspect" ||
+          c.name == "promote" ||
+          c.name == "ps" ||
+          c.name == "rm" ||
+          c.name == "update"
+      )
+      .forEach((c) => {
+        c.args = {
+          name: "NODE",
+          generators: dockerGenerators.listDockerSwarmNodes,
+          isVariadic: true,
+        };
+      });
+  }
+
+  // dockerGenerators.listDockerPlugins
+  if (command.name == "plugin") {
+    command.subcommands
+      .filter((c) => c.name == "enable" || c.name == "disable")
+      .forEach((c) => {
+        c.args = {
+          name: "PLUGIN",
+          generators: dockerGenerators.listDockerPlugins,
+        };
+      });
+
+    command.subcommands
+      .filter((c) => c.name == "inspect" || c.name == "rm")
+      .forEach((c) => {
+        c.args = {
+          name: "PLUGIN",
+          generators: dockerGenerators.listDockerPlugins,
+          isVariadic: true,
+        };
+      });
+
+    command.subcommands.find((c) => c.name == "set").args = [
+      {
+        name: "PLUGIN",
+        generators: dockerGenerators.listDockerPlugins,
+      },
+      { name: "KEY=VALUE", isVariadic: true },
+    ];
+
+    command.subcommands.find((c) => c.name == "upgrade").args = [
+      {
+        name: "PLUGIN",
+        generators: dockerGenerators.listDockerPlugins,
+      },
+      { name: "REMOTE" },
+    ];
+  }
+
+  // dockerGenerators.listDockerSecrets
+  if (command.name == "secret") {
+    command.subcommands
+      .filter((c) => c.name == "inspect" || c.name == "rm")
+      .forEach((c) => {
+        c.args = {
+          name: "SECRET",
+          generators: dockerGenerators.listDockerSecrets,
+          isVariadic: true,
+        };
+      });
+  }
+
+  // dockerGenerators.listDockerServices
+  if (command.name == "service") {
+    command.subcommands
+      .filter((c) => c.name == "inspect" || c.name == "ps" || c.name == "rm")
+      .forEach((c) => {
+        c.args = {
+          name: "SERVICE",
+          generators: dockerGenerators.listDockerServices,
+          isVariadic: true,
+        };
+      });
+
+    command.subcommands
+      .filter(
+        (c) => c.name == "logs" || c.name == "rollback" || c.name == "update"
+      )
+      .forEach((c) => {
+        c.args = {
+          name: "SERVICE",
+          generators: dockerGenerators.listDockerServices,
+        };
+      });
+
+    command.subcommands.find((c) => c.name == "logs").args = {
+      name: "SERVICE OR TASK",
+      generators: dockerGenerators.listDockerServices,
+    };
+
+    command.subcommands.find((c) => c.name == "scale").args = {
+      name: "SERVICE=REPLICAS",
+      generators: dockerGenerators.listDockerServicesReplicas,
+      isVariadic: true,
+    };
+  }
+});
+
+export default completionSpec;
