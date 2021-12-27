@@ -90,12 +90,12 @@ func (p *dockerParser) parseOptions(lines []string) []*Option {
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		r := strings.SplitN(line, "  ", 2)
-		if len(r) == 1 {
-			opts[len(opts)-1].Desc += convertDesc(r[0])
+		if !strings.HasPrefix(line, "-") {
+			opts[len(opts)-1].Desc += "," + convertDesc(line)
 			continue
 		}
 
+		r := strings.SplitN(line, "  ", 2)
 		str := r[0]
 		desc := convertDesc(r[1])
 		arr := strings.Split(str, " ")

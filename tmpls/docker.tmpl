@@ -471,6 +471,215 @@ completionSpec.subcommands.forEach((command) => {
       isVariadic: true,
     };
   }
+
+  // dockerGenerators.listDockerStacks
+  if (command.name == "stack") {
+    command.subcommands
+      .filter((c) => c.name == "ps" || c.name == "services")
+      .forEach((c) => {
+        c.args = {
+          name: "STACK",
+          generators: dockerGenerators.listDockerStacks,
+        };
+      });
+
+    command.subcommands.find((c) => c.name == "rm").args = {
+      name: "STACK",
+      generators: dockerGenerators.listDockerStacks,
+      isVariadic: true,
+    };
+  }
+
+  // dockerGenerators.listDockerVolumes
+  if (command.name == "volume") {
+    command.subcommands
+      .filter((c) => c.name == "inspect" || c.name == "rm")
+      .forEach((c) => {
+        c.args = {
+          name: "VOLUME",
+          generators: dockerGenerators.listDockerVolumes,
+          isVariadic: true,
+        };
+      });
+  }
+
+  // template
+  if (command.name == "config") {
+    command.subcommands.find((c) => c.name == "create").args = {
+      name: "file",
+      template: "filepaths",
+    };
+  }
+  if (command.name == "context") {
+    command.subcommands.find((c) => c.name == "import").args = [
+      { name: "CONTEXT" },
+      { name: "FILE", template: "filepaths" },
+    ];
+  }
+  if (command.name == "plugin") {
+    command.subcommands.find((c) => c.name == "create").args = [
+      { name: "PLUGIN" },
+      { name: "PLUGIN-DATA-DIR", template: "filepaths" },
+    ];
+  }
+  if (command.name == "secret") {
+    command.subcommands.find((c) => c.name == "create").args = [
+      { name: "SECRET NAME" },
+      { name: "SECRET", template: "filepaths" },
+    ];
+  }
 });
+
+let handleCommand = function (c: Fig.Subcommand) {
+  if (c.options != null) {
+    c.options.forEach((co) => {
+      // suggestions
+      if (co.name.includes("--log-driver")) {
+        co.args = {
+          name: "string",
+          suggestions: [
+            "json-file",
+            "syslog",
+            "journald",
+            "gelf",
+            "fluentd",
+            "awslogs",
+            "splunk",
+            "etwlogs",
+            "gcplogs",
+            "none",
+          ],
+        };
+      }
+      if (co.description.includes("('always'|'missing'|'never')")) {
+        co.args = {
+          name: "string",
+          suggestions: ["always", "missing", "never"],
+        };
+      }
+
+      if (co.description.includes("(host|private)")) {
+        co.args = {
+          name: "string",
+          suggestions: ["host", "private"],
+        };
+      }
+
+      if (co.description.includes("(swarm|kubernetes|all)")) {
+        co.args = {
+          name: "string",
+          suggestions: ["swarm", "kubernetes", "all"],
+        };
+      }
+
+      if (co.description.includes("('active'|'pause'|'drain')")) {
+        co.args = {
+          name: "string",
+          suggestions: ["active", "pause", "drain"],
+        };
+      }
+
+      if (co.description.includes("('worker'|'manager')")) {
+        co.args = {
+          name: "string",
+          suggestions: ["worker", "manager"],
+        };
+      }
+
+      if (co.description.includes("('none'|'on-failure'|'any')")) {
+        co.args = {
+          name: "string",
+          suggestions: ["none", "on-failure", "any"],
+        };
+      }
+
+      if (co.description.includes("('pause'|'continue')")) {
+        co.args = {
+          name: "string",
+          suggestions: ["pause", "continue"],
+        };
+      }
+
+      if (co.description.includes("('pause'|'continue'|'rollback')")) {
+        co.args = {
+          name: "string",
+          suggestions: ["pause", "continue", "rollback"],
+        };
+      }
+
+      if (co.description.includes("('start-first'|'stop-first')")) {
+        co.args = {
+          name: "string",
+          suggestions: ["start-first", "stop-first"],
+        };
+      }
+
+      if (co.description.includes("('always'|'changed'|'never')")) {
+        co.args = {
+          name: "string",
+          suggestions: ["always", "changed", "never"],
+        };
+      }
+
+      if (co.description.includes("(true|false)")) {
+        co.args = {
+          name: "string",
+          suggestions: ["true", "false"],
+        };
+      }
+
+      if (co.description.includes("('debug'|'info'|'warn'|'error'|'fatal')")) {
+        co.args = {
+          name: "string",
+          suggestions: ["debug", "info", "warn", "error", "fatal"],
+        };
+      }
+
+      if (
+        co.description.includes(
+          "(replicated, global, replicated-job, or global-job)"
+        )
+      ) {
+        co.args = {
+          name: "string",
+          suggestions: ["replicated", "global", "replicated-job", "global-job"],
+        };
+      }
+
+      // template
+      if (co.name.includes("--ca-key") || co.name.includes("--ca-cert")) {
+        co.args = {
+          name: "pem-file",
+          template: "filepaths",
+        };
+      }
+      if (co.name.includes("--compose-file")) {
+        co.args = {
+          name: "strings",
+          template: "filepaths",
+        };
+      }
+    });
+  }
+  if (c.name == "build") {
+    c.args = {
+      name: "path",
+      generators: {
+        template: "folders",
+      },
+    };
+    c.options.find((co) => co.name.includes("--file")).args = {
+      name: "string",
+      generators: {
+        template: "filepaths",
+      },
+    };
+  }
+
+  if (c.subcommands != null) {
+    c.subcommands.forEach((cc) => handleCommand(cc));
+  }
+};
+handleCommand(completionSpec);
 
 export default completionSpec;
