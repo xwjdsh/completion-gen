@@ -13,7 +13,7 @@
   options: [
 	{{- range .Options}}
     {
-      name: [{{.Name}}],
+      name: {{.Name}},
       description: "{{.Desc}}",
 			{{- if eq (len .Args) 1 }}
       args: {

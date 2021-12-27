@@ -87,6 +87,7 @@ func (p *dockerParser) parseCommands(command string, lines []string) ([]*Command
 
 func (p *dockerParser) parseOptions(lines []string) []*Option {
 	opts := []*Option{}
+	hasHelp := false
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -103,14 +104,17 @@ func (p *dockerParser) parseOptions(lines []string) []*Option {
 		opt := &Option{Desc: desc}
 		var arg *Arg
 		if strings.HasSuffix(arr[0], ",") {
-			opt.Name = fmt.Sprintf(`"%s", "%s"`, arr[0][0:len(arr[0])-1], arr[1])
+			opt.Name = fmt.Sprintf(`["%s", "%s"]`, arr[0][0:len(arr[0])-1], arr[1])
 			if len(arr) > 2 {
 				arg = &Arg{
 					Name: arr[2],
 				}
 			}
 		} else {
-			opt.Name = fmt.Sprintf(`"%s"`, arr[0])
+			if arr[0] == "--help" {
+				hasHelp = true
+			}
+			opt.Name = fmt.Sprintf(`["%s"]`, arr[0])
 			if len(arr) > 1 {
 				arg = &Arg{
 					Name: arr[1],
@@ -121,6 +125,12 @@ func (p *dockerParser) parseOptions(lines []string) []*Option {
 			opt.Args = append(opt.Args, arg)
 		}
 		opts = append(opts, opt)
+	}
+	if !hasHelp {
+		opts = append(opts, &Option{
+			Name: `"--help"`,
+			Desc: "Print usage",
+		})
 	}
 
 	return opts
