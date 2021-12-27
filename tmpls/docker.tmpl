@@ -528,6 +528,59 @@ completionSpec.subcommands.forEach((command) => {
       { name: "SECRET", template: "filepaths" },
     ];
   }
+
+  // customize
+  if (command.name == "inspect") {
+    command.args = {
+      // TODO: There are more types of docker objects beyond running containers
+      // that can be inspected
+      name: "Name or ID",
+      generators: [
+        {
+          script: `docker ps -a --format '{{`{{ json . }}`}}'`,
+          postProcess: function (out) {
+            const allLines = out.split("\n").map((line) => JSON.parse(line));
+            return allLines.map((i) => ({
+              name: i.ID,
+              displayName: `[con] ${i.ID} (${i.Image})`,
+            }));
+          },
+        },
+        {
+          script: `docker images -a --format '{{`{{ json . }}`}}'`,
+          postProcess: function (out) {
+            const allLines = out.split("\n").map((line) => JSON.parse(line));
+            return allLines.map((i) => {
+              let displayName;
+              if (i.Repository === "\u003cnone\u003e") {
+                displayName = i.ID;
+              } else {
+                displayName = i.Repository;
+                if (i.Tag !== "\u003cnone\u003e") {
+                  displayName += `:${i.Tag}`;
+                }
+              }
+
+              return {
+                name: i.ID,
+                displayName: `[img] ${displayName}`,
+              };
+            });
+          },
+        },
+        {
+          script: `docker volume ls --format '{{`{{ json . }}`}}'`,
+          postProcess: function (out) {
+            const allLines = out.split("\n").map((line) => JSON.parse(line));
+            return allLines.map((i) => ({
+              name: i.Name,
+              displayName: `[vol] ${i.Name}`,
+            }));
+          },
+        },
+      ],
+    };
+  }
 });
 
 let handleCommand = function (c: Fig.Subcommand) {
@@ -661,6 +714,7 @@ let handleCommand = function (c: Fig.Subcommand) {
       }
     });
   }
+
   if (c.name == "build") {
     c.args = {
       name: "path",
@@ -674,6 +728,81 @@ let handleCommand = function (c: Fig.Subcommand) {
         template: "filepaths",
       },
     };
+    c.options.find((co) => co.name.includes("--target")).args = {
+      name: "target build stage",
+      generators: {
+        trigger: function () {
+          return true;
+        },
+        script: function (context) {
+          let fileFlagIndex, dockerfilePath;
+          if (context.includes("-f")) {
+            fileFlagIndex = context.indexOf("-f");
+            dockerfilePath = context[fileFlagIndex + 1];
+          } else if (context.includes("--file")) {
+            fileFlagIndex = context.indexOf("--file");
+            dockerfilePath = context[fileFlagIndex + 1];
+          } else {
+            dockerfilePath = "$PWD/Dockerfile";
+          }
+
+          return `\grep -iE 'FROM.*AS' "${dockerfilePath}"`;
+        },
+        postProcess: function (out) {
+          // This just searches the Dockerfile for the alias name after AS,
+          // and due to the grep above, will only match lines where FROM and AS
+          // are on the same line. This could certainly be made more robust
+          // down the line.
+          const imageNameRegexp = /(?:[aA][sS]\s+)([\w:.-]+)/;
+          return out
+            .split("\n")
+            .map((i) => {
+              const result = imageNameRegexp.exec(i);
+              if (result) {
+                return {
+                  name: result[1],
+                };
+              }
+            })
+            .filter((i) => i !== undefined);
+        },
+      },
+    };
+  }
+
+  if (c.name == "run" || c.name == "exec") {
+    c.options.push({
+      name: "-it",
+      description: "Launch an interactive session",
+      icon: "fig://icon?type=commandkey",
+    });
+  }
+
+  if (c.name == "run") {
+    c.args = [
+      {
+        name: "image",
+        description: "The Docker image to use",
+        generators: {
+          script:
+					"docker images --format '{{`{{.Repository}} {{.Size}} {{.Tag}} {{.ID}}`}}'",
+          postProcess: function (out) {
+            return out.split("\n").map((image) => {
+              const [repo, size, tag, id] = image.split(" ");
+              return {
+                name: repo,
+                description: `${id}@${tag} - ${size}`,
+                icon: "fig://icon?type=docker",
+              };
+            });
+          },
+        },
+      },
+      {
+        name: "command",
+        // description: "The command to run in the container"
+      },
+    ];
   }
 
   if (c.subcommands != null) {

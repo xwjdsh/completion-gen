@@ -11,7 +11,14 @@ import (
 )
 
 var (
-	tpl       = template.New("")
+	tpl = template.New("").Funcs(template.FuncMap{
+		"formatDesc": func(desc string) string {
+			if strings.Contains(desc, "\n") {
+				return fmt.Sprintf("`%s`", desc)
+			}
+			return fmt.Sprintf(`"%s"`, desc)
+		},
+	})
 	parserMap = map[string]Parser{}
 )
 

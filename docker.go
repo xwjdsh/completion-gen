@@ -92,7 +92,7 @@ func (p *dockerParser) parseOptions(lines []string) []*Option {
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if !strings.HasPrefix(line, "-") {
-			opts[len(opts)-1].Desc += "," + convertDesc(line)
+			opts[len(opts)-1].Desc += "\n" + convertDesc(line)
 			continue
 		}
 

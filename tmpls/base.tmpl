@@ -1,7 +1,7 @@
 {{- define "command" }}
 {
   name: "{{.Name}}",
-  description: "{{.Desc}}",
+  description: {{formatDesc .Desc}},
 	{{- if .SubCommands }}
   subcommands: [
 	{{- range .SubCommands}}
@@ -14,7 +14,7 @@
 	{{- range .Options}}
     {
       name: {{.Name}},
-      description: "{{.Desc}}",
+      description: {{formatDesc .Desc}},
 			{{- if eq (len .Args) 1 }}
       args: {
         name: "{{(index .Args 0).Name}}",
